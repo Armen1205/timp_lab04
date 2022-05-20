@@ -1,48 +1,54 @@
-name: CI
+name: deb_packege
+
 on:
-  push:
-    branches: [ main ]
+ push:
+     tags:
+      - "*deb_v*"
+   
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  build_all_libraries:
+  build:
     runs-on: ubuntu-latest
     steps:
-      
       - uses: actions/checkout@v3
-
-      - name: prepairing
-        run: sudo apt install cmake g++ clang-11
       
-      - name: Building of forrmater_lib
+      - name: prepering to build
+        run: sudo apt install cmake g++
+          
+      - name: Building of solver for release
         run: |
-         cd formatter_lib
-         cmake . -DCMAKE_CXX_COMPILER=clang++
-         cmake --build .
-         cd ..
+          cmake -DCPACK_GENERATOR_DEB=ON -B ./_build
+          cd _build
+          make package
+          make package_source
+          cd ..
+          cd ..
         
-      - name: Building of forrmater_ex_lib
+      - name: Moving to artifacts
         run: |
-          cd formatter_ex_lib
-          cmake . -DCMAKE_CXX_COMPILER=clang++
-          cmake --build .
-          cd ..
+          mv /home/runner/work/Lab09_TIMP/Lab09_TIMP/_build/*.deb artifacts
+          mv /home/runner/work/Lab09_TIMP/Lab09_TIMP/_build/*.zip artifacts
+          mv /home/runner/work/Lab09_TIMP/Lab09_TIMP/_build/*.tar.gz artifacts
           
-      - name: Building of hello_world_application
-        run: |
-          cd hello_world_application
-          cmake . -DCMAKE_CXX_COMPILER=clang++
-          cmake --build .
-          cd ..
+      - name: Create a release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
           
-      - name: Building of solver_lib
-        run: |
-          cd solver_lib
-          cmake . -DCMAKE_CXX_COMPILER=clang++
-          cmake --build .
-          cd ..
-          
-      - name: Building of solver_application
-        run: |
-          cd solver_application
-          cmake . -DCMAKE_CXX_COMPILER=clang++
-          cmake --build .
-          cd ..  
+      - name: Upload release
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/solver-0.1.1-Linux.deb
+          asset_name: solver.deb
+          asset_content_type: application/deb
